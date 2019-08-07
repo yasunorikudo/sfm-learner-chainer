@@ -1,5 +1,5 @@
 import numpy as np
-from path import Path
+from pathlib import Path
 import scipy.misc
 
 
@@ -10,7 +10,7 @@ class KittiRawLoader(object):
                  img_height=128,
                  img_width=416,
                  seq_length=3):
-        dir_path = Path(__file__).realpath().dirname()
+        dir_path = Path(__file__).resolve().parent
         test_scene_file = dir_path/'test_scenes_eigen.txt'
         static_frames_file = Path(static_frames_file)
         with open(test_scene_file, 'r') as f:
@@ -41,15 +41,16 @@ class KittiRawLoader(object):
     def collect_train_folders(self):
         self.scenes = []
         for date in self.date_list:
-            drive_set = (self.dataset_dir/date).dirs()
+            drive_set = (self.dataset_dir/date).glob('*')
             for dr in drive_set:
-                if dr.name[:-5] not in self.test_scenes:
-                    self.scenes.append(dr)
+                if dr.is_dir():
+                    if dr.name[:-5] not in self.test_scenes:
+                        self.scenes.append(dr)
 
     def collect_scenes(self, drive):
         train_scenes = []
         for c in self.cam_ids:
-            oxts = sorted((drive/'oxts'/'data').files('*.txt'))
+            oxts = sorted((drive/'oxts'/'data').glob('*.txt'))
             scene_data = {'cid': c, 'dir': drive, 'speed': [], 'frame_id': [], 'rel_path': drive.name + '_' + c}
             for n, f in enumerate(oxts):
                 metadata = np.genfromtxt(f)
@@ -80,8 +81,8 @@ class KittiRawLoader(object):
         return intrinsics
 
     def load_image(self, scene_data, tgt_idx):
-        img_file = scene_data['dir']/'image_{}'.format(scene_data['cid'])/'data'/scene_data['frame_id'][tgt_idx]+'.png'
-        if not img_file.isfile():
+        img_file = scene_data['dir']/'image_{}'.format(scene_data['cid'])/'data'/(scene_data['frame_id'][tgt_idx]+'.png')
+        if not img_file.exists():
             return None
         img = scipy.misc.imread(img_file)
         zoom_y = self.img_height/img.shape[0]

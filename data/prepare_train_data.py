@@ -4,7 +4,8 @@ import scipy.misc
 import numpy as np
 from joblib import Parallel, delayed
 from tqdm import tqdm
-from path import Path
+from pathlib import Path
+import shutil
 
 parser = argparse.ArgumentParser()
 parser.add_argument("dataset_dir", metavar='DIR',
@@ -26,7 +27,7 @@ def dump_example(scene):
     scene_list = data_loader.collect_scenes(scene)
     for scene_data in scene_list:
         dump_dir = args.dump_root/scene_data['rel_path']
-        dump_dir.makedirs_p()
+        dump_dir.mkdir(parents=True, exist_ok=True)
         intrinsics = scene_data['intrinsics']
         fx = intrinsics[0, 0]
         fy = intrinsics[1, 1]
@@ -41,17 +42,17 @@ def dump_example(scene):
             dump_img_file = dump_dir/'{}.jpg'.format(frame_nb)
             scipy.misc.imsave(dump_img_file, img)
 
-        if len(dump_dir.files('*.jpg')) < 3:
-            dump_dir.rmtree()
+        if len([im_ for im_ in dump_dir.glob('*.jpg')]) < 3:
+            shutil.rmtree(dump_dir)
 
 
 def main():
     args.dump_root = Path(args.dump_root)
-    args.dump_root.mkdir_p()
+    args.dump_root.mkdir(parents=True, exist_ok=True)
 
     global data_loader
 
-    if args.dataset_format == 'kitti':
+    if args.dataset_format == 'kitti_raw':
         from kitti_raw_loader import KittiRawLoader
         data_loader = KittiRawLoader(args.dataset_dir,
                                      static_frames_file=args.static_frames,
@@ -78,14 +79,15 @@ def main():
     # Split into train/val
     print('Generating train val lists')
     np.random.seed(8964)
-    subfolders = args.dump_root.dirs()
+    subfolders = args.dump_root.glob('*')
     with open(args.dump_root / 'train.txt', 'w') as tf:
         with open(args.dump_root / 'val.txt', 'w') as vf:
             for s in tqdm(subfolders):
-                if np.random.random() < 0.1 and args.dataset_format != "kitti_odom":
-                    vf.write('{}\n'.format(s.name))
-                else:
-                    tf.write('{}\n'.format(s.name))
+                if s.is_dir():
+                    if np.random.random() < 0.1 and args.dataset_format != "kitti_odom":
+                        vf.write('{}\n'.format(s.name))
+                    else:
+                        tf.write('{}\n'.format(s.name))
 
 
 if __name__ == '__main__':
